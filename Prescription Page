@@ -1,0 +1,199 @@
+import javafx.application.Application;
+import javafx.geometry.*;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+import java.util.*;
+
+public class PrescriptionsPage extends Application {
+    private int userId;
+    private String firstName;
+    public PrescriptionsPage(int userId, String firstName) {
+        this.userId = userId;
+        this.firstName = firstName;
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Sidebar
+        VBox sidebar = new VBox(20);
+        sidebar.setPadding(new Insets(30, 0, 30, 0));
+        sidebar.setPrefWidth(260);
+        sidebar.setStyle("-fx-background-color: #f8fafc; -fx-border-color: #e0e0e0; -fx-border-width: 0 1 0 0;");
+        Label logo = new Label("Hospital System\nPatient Portal");
+        logo.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+        logo.setTextAlignment(TextAlignment.CENTER);
+        logo.setAlignment(Pos.CENTER);
+        logo.setPadding(new Insets(0, 0, 20, 0));
+        sidebar.getChildren().add(logo);
+        sidebar.getChildren().add(createSidebarItem("Dashboard", "\uD83C\uDFE0", false, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Appointments", "\uD83D\uDCC5", false, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Prescriptions", "\uD83D\uDC8A", true, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Booked Appointments", "\uD83D\uDCC6", false, primaryStage));
+        sidebar.getChildren().add(new VBox()); // Spacer
+        Button logoutBtn = new Button("\u21B7  Logout");
+        logoutBtn.setStyle("-fx-background-color: #ff5252; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 0 10 0;");
+        logoutBtn.setPrefWidth(200);
+        sidebar.getChildren().add(logoutBtn);
+
+        // Main content
+        VBox mainContent = new VBox(24);
+        mainContent.setPadding(new Insets(36, 36, 36, 36));
+        mainContent.setStyle("-fx-background-color: #f6f8fc;");
+
+        // Header
+        Label header = new Label("Prescriptions");
+        header.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
+        header.setPadding(new Insets(0, 0, 10, 0));
+
+        // Search bar
+        HBox searchRow = new HBox(10);
+        searchRow.setAlignment(Pos.CENTER_LEFT);
+        TextField searchField = new TextField();
+        searchField.setPromptText("Search by medicine or doctor");
+        searchField.setPrefWidth(300);
+        searchRow.getChildren().addAll(new Label("Search:"), searchField);
+
+        // Table
+        TableView<Map<String, String>> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPrefHeight(500);
+        TableColumn<Map<String, String>, String> medCol = new TableColumn<>("Medicine Name");
+        medCol.setCellValueFactory(data -> new javafx.beans.property.ReadOnlyStringWrapper(data.getValue().get("medicine")));
+        TableColumn<Map<String, String>, String> docCol = new TableColumn<>("Doctor");
+        docCol.setCellValueFactory(data -> new javafx.beans.property.ReadOnlyStringWrapper(data.getValue().get("doctor")));
+        TableColumn<Map<String, String>, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(data -> new javafx.beans.property.ReadOnlyStringWrapper(data.getValue().get("date")));
+        TableColumn<Map<String, String>, String> dosageCol = new TableColumn<>("Dosage");
+        dosageCol.setCellValueFactory(data -> new javafx.beans.property.ReadOnlyStringWrapper(data.getValue().get("dosage")));
+        TableColumn<Map<String, String>, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(data -> new javafx.beans.property.ReadOnlyStringWrapper(data.getValue().get("status")));
+        TableColumn<Map<String, String>, Void> actionCol = new TableColumn<>("Action");
+        actionCol.setCellFactory(col -> new TableCell<>() {
+            private final Button completeBtn = new Button("Mark as Completed");
+            {
+                completeBtn.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+                completeBtn.setOnAction(e -> {
+                    Map<String, String> row = getTableView().getItems().get(getIndex());
+                    row.put("status", "Completed");
+                    getTableView().refresh();
+                });
+            }
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    Map<String, String> row = getTableView().getItems().get(getIndex());
+                    if (row.get("status").equals("Active")) {
+                        setGraphic(completeBtn);
+                    } else {
+                        setGraphic(null);
+                    }
+                }
+            }
+        });
+        table.getColumns().addAll(medCol, docCol, dateCol, dosageCol, statusCol, actionCol);
+
+        // Dummy data
+        List<Map<String, String>> prescriptions = new ArrayList<>();
+        prescriptions.add(createPrescription("Amoxicillin", "Dr. Sarah Johnson", "2025-04-28", "500mg, 2x daily", "Active"));
+        prescriptions.add(createPrescription("Ibuprofen", "Dr. Michael Chen", "2025-04-15", "200mg, as needed", "Completed"));
+        prescriptions.add(createPrescription("Metformin", "Dr. Emily Wilson", "2025-03-30", "1000mg, 1x daily", "Active"));
+        prescriptions.add(createPrescription("Atorvastatin", "Dr. Sarah Johnson", "2025-02-20", "20mg, 1x daily", "Completed"));
+        table.getItems().addAll(prescriptions);
+
+        // Filter logic
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
+            String search = newVal.trim().toLowerCase();
+            table.getItems().clear();
+            for (Map<String, String> p : prescriptions) {
+                if (search.isEmpty() || p.get("medicine").toLowerCase().contains(search) || p.get("doctor").toLowerCase().contains(search)) {
+                    table.getItems().add(p);
+                }
+            }
+        });
+
+        mainContent.getChildren().addAll(header, searchRow, table);
+        HBox root = new HBox(sidebar, mainContent);
+        HBox.setHgrow(mainContent, Priority.ALWAYS);
+        Scene scene = new Scene(root, 1300, 800);
+        primaryStage.setScene(scene);
+        primaryStage.setTitle("Prescriptions");
+        primaryStage.setResizable(false);
+        primaryStage.show();
+    }
+
+    private Map<String, String> createPrescription(String medicine, String doctor, String date, String dosage, String status) {
+        Map<String, String> map = new HashMap<>();
+        map.put("medicine", medicine);
+        map.put("doctor", doctor);
+        map.put("date", date);
+        map.put("dosage", dosage);
+        map.put("status", status);
+        return map;
+    }
+
+    private HBox createSidebarItem(String text, String icon, boolean active, Stage primaryStage) {
+        HBox box = new HBox(16);
+        box.setAlignment(Pos.CENTER_LEFT);
+        box.setPadding(new Insets(8, 0, 8, 32));
+        if (active) {
+            box.setStyle("-fx-background-color: #e9f1ff; -fx-background-radius: 8 0 0 8;");
+        }
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Segoe UI", 22));
+        Label textLabel = new Label(text);
+        textLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
+        box.getChildren().addAll(iconLabel, textLabel);
+
+        // Navigation logic
+        if (text.equals("Dashboard")) {
+            box.setOnMouseClicked(e -> {
+                PatientDashboard dashboardPage = new PatientDashboard(userId, firstName);
+                try {
+                    dashboardPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        } else if (text.equals("Appointments")) {
+            box.setOnMouseClicked(e -> {
+                BookAppointmentPage apptPage = new BookAppointmentPage(userId, firstName);
+                try {
+                    apptPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        } else if (text.equals("Prescriptions")) {
+            box.setOnMouseClicked(e -> {
+                PrescriptionsPage presPage = new PrescriptionsPage(userId, firstName);
+                try {
+                    presPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        } else if (text.equals("Booked Appointments")) {
+            box.setOnMouseClicked(e -> {
+                BookedAppointmentsPage bookedPage = new BookedAppointmentsPage(userId, firstName);
+                try {
+                    bookedPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        }
+
+        return box;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+} 
