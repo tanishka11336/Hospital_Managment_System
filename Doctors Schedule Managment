@@ -1,0 +1,214 @@
+import javafx.application.Application;
+import javafx.geometry.*;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+import java.time.LocalDate;
+import java.util.*;
+import database.AppointmentManager;
+import javafx.collections.FXCollections;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import database.DatabaseConnection;
+
+public class DoctorSchedule extends Application {
+    private final int doctorId;
+    private final String firstName;
+    private LocalDate selectedDate = LocalDate.now();
+    private static final List<String> STANDARD_SLOTS = Arrays.asList(
+        "09:00:00", "09:30:00", "10:00:00", "10:30:00", "11:00:00", "11:30:00",
+        "12:00:00", "12:30:00", "13:00:00", "13:30:00", "14:00:00", "14:30:00",
+        "15:00:00", "15:30:00", "16:00:00", "16:30:00", "17:00:00"
+    );
+
+    public DoctorSchedule(int id, String firstName) {
+        // Check if the id is a user_id or doctor_id
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // First try to find if it's a doctor_id
+            String checkDoctorSql = "SELECT doctor_id FROM doctors WHERE doctor_id = ?";
+            PreparedStatement checkDoctorStmt = conn.prepareStatement(checkDoctorSql);
+            checkDoctorStmt.setInt(1, id);
+            ResultSet rs = checkDoctorStmt.executeQuery();
+            
+            if (rs.next()) {
+                // It's a doctor_id
+                this.doctorId = id;
+            } else {
+                // It's a user_id, get the doctor_id
+                String getUserSql = "SELECT doctor_id FROM doctors WHERE user_id = ?";
+                PreparedStatement getUserStmt = conn.prepareStatement(getUserSql);
+                getUserStmt.setInt(1, id);
+                rs = getUserStmt.executeQuery();
+                
+                if (rs.next()) {
+                    this.doctorId = rs.getInt("doctor_id");
+                } else {
+                    throw new RuntimeException("No doctor found for the given ID");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to get doctor ID: " + e.getMessage());
+        }
+        this.firstName = firstName;
+        System.out.println("Current doctorId: " + doctorId);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Sidebar
+        VBox sidebar = new VBox(20);
+        sidebar.setPadding(new Insets(30, 0, 30, 0));
+        sidebar.setPrefWidth(240);
+        sidebar.setStyle("-fx-background-color: #f5f7fa; -fx-border-color: #e0e0e0; -fx-border-width: 0 1 0 0;");
+
+        Label logo = new Label("Hospital System\nDoctor Portal");
+        logo.setFont(Font.font("Times New Roman", FontWeight.BOLD, 22));
+        logo.setTextAlignment(TextAlignment.CENTER);
+        logo.setAlignment(Pos.CENTER);
+        logo.setPadding(new Insets(0, 0, 20, 0));
+        sidebar.getChildren().add(logo);
+
+        sidebar.getChildren().add(createSidebarItem("Dashboard", "\uD83D\uDCC5", false, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("My Schedule", "\u23F0", true, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Patients", "\uD83D\uDC65", false, primaryStage));
+        sidebar.getChildren().add(new VBox()); // Spacer
+
+        Button logoutBtn = new Button("\u21B7  Logout");
+        logoutBtn.setStyle("-fx-background-color: #ff5252; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 0 10 0;");
+        logoutBtn.setPrefWidth(200);
+        sidebar.getChildren().add(logoutBtn);
+
+        // Main content
+        VBox mainContent = new VBox(20);
+        mainContent.setPadding(new Insets(40, 60, 40, 60));
+        Label header = new Label("My Schedule");
+        header.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+        VBox slotsBox = new VBox(10);
+        final Runnable[] updateSlots = new Runnable[1];
+        updateSlots[0] = () -> {
+            slotsBox.getChildren().clear();
+            List<Map<String, Object>> dbSlots = AppointmentManager.getAvailableSlotsForDoctor(doctorId, selectedDate);
+            Map<String, Map<String, Object>> slotMap = new HashMap<>();
+            for (Map<String, Object> slot : dbSlots) {
+                slotMap.put(slot.get("slot_time").toString(), slot);
+            }
+            for (String slotTime : STANDARD_SLOTS) {
+                HBox row = new HBox(10);
+                Label timeLabel = new Label(slotTime.substring(0, 5));
+                if (slotMap.containsKey(slotTime)) {
+                    boolean isBooked = Boolean.TRUE.equals(slotMap.get(slotTime).get("is_booked"));
+                    int slotId = (int) slotMap.get(slotTime).get("slot_id");
+                    if (isBooked) {
+                        Button bookedBtn = new Button("Booked");
+                        bookedBtn.setDisable(true);
+                        row.getChildren().addAll(timeLabel, bookedBtn);
+                    } else {
+                        Button delBtn = new Button("Delete");
+                        delBtn.setOnAction(ev -> {
+                            AppointmentManager.removeAvailableSlot(slotId);
+                            updateSlots[0].run();
+                        });
+                        row.getChildren().addAll(timeLabel, delBtn);
+                    }
+                } else {
+                    Button addBtn = new Button("Add");
+                    addBtn.setOnAction(ev -> {
+                        AppointmentManager.addAvailableSlot(doctorId, selectedDate, slotTime);
+                        updateSlots[0].run();
+                    });
+                    row.getChildren().addAll(timeLabel, addBtn);
+                }
+                slotsBox.getChildren().add(row);
+            }
+        };
+        DatePicker datePicker = new DatePicker(selectedDate);
+        datePicker.setOnAction(e -> {
+            selectedDate = datePicker.getValue();
+            updateSlots[0].run();
+        });
+        ComboBox<String> timeSlotCombo = new ComboBox<>();
+        timeSlotCombo.setPromptText("Select Time Slot");
+        timeSlotCombo.setItems(FXCollections.observableArrayList(STANDARD_SLOTS));
+        Button addSlotBtn = new Button("Add Slot");
+        addSlotBtn.setOnAction(e -> {
+            String selectedTime = timeSlotCombo.getValue();
+            if (selectedTime == null) {
+                showAlert("Please select a time slot.");
+                return;
+            }
+            AppointmentManager.addAvailableSlot(doctorId, selectedDate, selectedTime);
+            updateSlots[0].run();
+        });
+        HBox addSlotBox = new HBox(10, timeSlotCombo, addSlotBtn);
+        // Initial load
+        updateSlots[0].run();
+        mainContent.getChildren().addAll(header, new Label("Select Date:"), datePicker, addSlotBox, slotsBox);
+        HBox rootLayout = new HBox(sidebar, mainContent);
+        HBox.setHgrow(mainContent, Priority.ALWAYS);
+        Scene scene = new Scene(rootLayout, 900, 700);
+        primaryStage.setScene(scene);
+        primaryStage.setTitle("Doctor Schedule");
+        primaryStage.show();
+    }
+
+    private HBox createSidebarItem(String text, String icon, boolean active, Stage primaryStage) {
+        HBox box = new HBox(16);
+        box.setAlignment(Pos.CENTER_LEFT);
+        box.setPadding(new Insets(8, 0, 8, 32));
+        if (active) {
+            box.setStyle("-fx-background-color: #e9f1ff; -fx-background-radius: 8 0 0 8;");
+        }
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Times New Roman", 22));
+        Label textLabel = new Label(text);
+        textLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 18));
+        box.getChildren().addAll(iconLabel, textLabel);
+        // Navigation logic
+        if (text.equals("Dashboard")) {
+            box.setOnMouseClicked(e -> {
+                DoctorDashboard dashboardPage = new DoctorDashboard(doctorId, firstName);
+                try {
+                    dashboardPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        } else if (text.equals("My Schedule")) {
+            box.setOnMouseClicked(e -> {
+                DoctorSchedule schedulePage = new DoctorSchedule(doctorId, firstName);
+                try {
+                    schedulePage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        } else if (text.equals("Patients")) {
+            box.setOnMouseClicked(e -> {
+                PatientsPage patientsPage = new PatientsPage(doctorId, firstName);
+                try {
+                    patientsPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        }
+        return box;
+    }
+
+    private void showAlert(String msg) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Info");
+        alert.setHeaderText(null);
+        alert.setContentText(msg);
+        alert.showAndWait();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
