@@ -1,0 +1,221 @@
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.stage.Stage;
+
+public class home extends Application {
+
+    @Override
+    public void start(Stage primaryStage) {
+        VBox root = new VBox();
+
+        // Navbar
+        HBox navbar = createNavbar();
+        VBox hero = createHeroSection();
+        VBox features = createFeatureSection();
+        HBox security = createSecuritySection();
+        VBox faq = createFaqSection();
+        VBox cta = createCTASection();
+        VBox footer = createFooter();
+
+        root.getChildren().addAll(navbar, hero, features, security, faq, cta, footer);
+        Scene scene = new Scene(root, 1200, 1000);
+        primaryStage.setTitle("Hospital Appointment Scheduling");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private HBox createNavbar() {
+        HBox navbar = new HBox();
+        navbar.setStyle("-fx-background-color: #3b5998;");
+        navbar.setPadding(new Insets(15));
+        navbar.setSpacing(20);
+        navbar.setAlignment(Pos.CENTER_LEFT);
+
+        Label logo = new Label("Hospital Scheduler");
+        logo.setTextFill(Color.WHITE);
+        logo.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+
+        HBox menu = new HBox(20, new Label("Products"), new Label("Solutions"),
+                new Label("Pricing"), new Label("Resources"));
+        menu.getChildren().forEach(node -> ((Label) node).setTextFill(Color.WHITE));
+
+        HBox buttons = new HBox(10);
+        Button login = new Button("Log In");
+        Button signup = new Button("Sign Up");
+        login.setStyle("-fx-background-color: white; -fx-text-fill: #3b5998;");
+        signup.setStyle("-fx-background-color: #00b894; -fx-text-fill: white;");
+        buttons.getChildren().addAll(login, signup);
+
+        Region spacer1 = new Region();
+        Region spacer2 = new Region();
+        HBox.setHgrow(spacer1, Priority.ALWAYS);
+        HBox.setHgrow(spacer2, Priority.ALWAYS);
+
+        navbar.getChildren().addAll(logo, spacer1, menu, spacer2, buttons);
+        return navbar;
+    }
+
+    private VBox createHeroSection() {
+        VBox hero = new VBox(10);
+        hero.setPadding(new Insets(40));
+        hero.setStyle("-fx-background-color: linear-gradient(to right, #6dd5ed, #2193b0);");
+        hero.setAlignment(Pos.CENTER);
+
+        Label heading = new Label("Hospital Appointment Scheduling Software");
+        heading.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        heading.setTextFill(Color.WHITE);
+
+        Label subtext = new Label("Simplify patient care with powerful scheduling tools.");
+        subtext.setTextFill(Color.WHITE);
+
+        ImageView imageView = new ImageView(new Image("file:assets/home.jpg"));
+        imageView.setFitHeight(250);
+        imageView.setPreserveRatio(true);
+
+        hero.getChildren().addAll(heading, subtext, imageView);
+        return hero;
+    }
+
+    private VBox createFeatureSection() {
+        VBox features = new VBox(20);
+        features.setPadding(new Insets(30));
+        features.setAlignment(Pos.CENTER);
+        Label title = new Label("Smart Features to Power Your Hospital");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+
+        GridPane grid = new GridPane();
+        grid.setHgap(20);
+        grid.setVgap(20);
+        grid.setAlignment(Pos.CENTER);
+
+        grid.add(createFeatureCard("🌐 24/7 Booking", "Let patients book online anytime."), 0, 0);
+        grid.add(createFeatureCard("🌍 Branded Website", "Give your hospital a professional online presence."), 1, 0);
+        grid.add(createFeatureCard("🧑‍🤝‍🧑 Patient Records", "Keep all client information secure and handy."), 0, 1);
+        grid.add(createFeatureCard("🔔 Reminders", "Reduce no-shows with automatic alerts."), 1, 1);
+
+        features.getChildren().addAll(title, grid);
+        return features;
+    }
+
+    private VBox createFeatureCard(String title, String description) {
+        VBox card = new VBox(10);
+        card.setStyle("-fx-background-color: #f1f1f1; -fx-border-radius: 10; -fx-background-radius: 10;");
+        card.setPadding(new Insets(20));
+        card.setPrefWidth(250);
+        Label head = new Label(title);
+        head.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        Label desc = new Label(description);
+        desc.setWrapText(true);
+        card.getChildren().addAll(head, desc);
+        return card;
+    }
+
+    private HBox createSecuritySection() {
+        HBox section = new HBox(30);
+        section.setPadding(new Insets(40));
+        section.setStyle("-fx-background-color: #ffffff;");
+        section.setAlignment(Pos.CENTER);
+
+        VBox text = new VBox(10);
+        Label heading = new Label("Patient's data are safe with us");
+        heading.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+
+        Label para = new Label("We take data and patient security seriously...");
+        ListView<String> list = new ListView<>();
+        list.getItems().addAll("HIPAA Compliance", "SSL Encryption", "GDPR Ready");
+        list.setMaxHeight(100);
+
+        Button more = new Button("Check out more");
+        more.setStyle("-fx-background-color: #4C75F2; -fx-text-fill: white;");
+
+        text.getChildren().addAll(heading, para, list, more);
+
+        ImageView img = new ImageView(new Image("https://cdn.pixabay.com/photo/2016/03/05/19/02/meeting-1232227_1280.jpg"));
+        img.setFitWidth(300);
+        img.setPreserveRatio(true);
+
+        section.getChildren().addAll(text, img);
+        return section;
+    }
+
+    private VBox createFaqSection() {
+        VBox faq = new VBox(10);
+        faq.setPadding(new Insets(40));
+        faq.setAlignment(Pos.CENTER);
+        Label title = new Label("FAQs");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+
+        faq.getChildren().add(title);
+        faq.getChildren().addAll(
+                createFaqItem("Is there a free hospital scheduling software?", "Yes, many providers offer free basic versions."),
+                createFaqItem("What is hospital appointment scheduling software?", "It’s a digital solution to manage and optimize patient appointments."),
+                createFaqItem("What are the benefits of scheduling apps for hospitals?", "They reduce wait times, streamline workflow, and improve satisfaction."),
+                createFaqItem("How can this system help manage hospital payments?", "It allows invoicing, tracking, and digital payments.")
+        );
+
+        return faq;
+    }
+
+    private TitledPane createFaqItem(String question, String answer) {
+        Label answerLabel = new Label(answer);
+        TitledPane tp = new TitledPane(question, answerLabel);
+        tp.setExpanded(false);
+        return tp;
+    }
+
+    private VBox createCTASection() {
+        VBox cta = new VBox(10);
+        cta.setAlignment(Pos.CENTER);
+        cta.setPadding(new Insets(30));
+        cta.setStyle("-fx-background-color: rgba(0,206,201,0.1);");
+
+        VBox box = new VBox(10);
+        box.setPadding(new Insets(20));
+        box.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12;");
+        box.setMaxWidth(400);
+        box.setAlignment(Pos.CENTER);
+
+        Label title = new Label("Try Our Scheduling Tool for Free");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+        Label subtitle = new Label("Sign up and get instant access to smart hospital tools.");
+        Button button = new Button("Create Free Account");
+        button.setStyle("-fx-background-color: #00cec9; -fx-text-fill: white;");
+
+        box.getChildren().addAll(title, subtitle, button);
+        cta.getChildren().add(box);
+        return cta;
+    }
+
+    private VBox createFooter() {
+        VBox footer = new VBox(10);
+        footer.setPadding(new Insets(30));
+        footer.setStyle("-fx-background-color: #001f3f;");
+        footer.setAlignment(Pos.CENTER);
+
+        Label hospital = new Label("Hospital Name");
+        hospital.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        hospital.setTextFill(Color.WHITE);
+
+        Label description = new Label("Providing quality healthcare services to our community for over 20 years.");
+        description.setTextFill(Color.LIGHTGRAY);
+
+        Label copyright = new Label("© 2025 Hospital Appointment System. All rights reserved.");
+        copyright.setTextFill(Color.LIGHTGRAY);
+
+        footer.getChildren().addAll(hospital, description, copyright);
+        return footer;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
