@@ -1,0 +1,369 @@
+import javafx.application.Application;
+import javafx.geometry.*;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+//import src.ModernSignupPage;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import database.DatabaseManager;
+import java.time.LocalDate;
+
+public class ModernLoginPage extends Application {
+    private String selectedRole = "Patient";
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Main login area (centered)
+        VBox loginArea = new VBox(12);
+        loginArea.setAlignment(Pos.CENTER);
+        loginArea.setPadding(new Insets(40));
+        loginArea.setMaxWidth(400);
+        loginArea.setMinWidth(320);
+        loginArea.setStyle("-fx-background-color: #fff; -fx-background-radius: 16; -fx-border-color: #e0e0e0; -fx-border-width: 1.2; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 8, 0, 0, 2);");
+
+        // Title
+        Label title = new Label("Sign In");
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
+        Label subtitle = new Label("Enter your credentials to access your account");
+        subtitle.setFont(Font.font("Segoe UI", 16));
+        subtitle.setTextFill(Color.web("#6b7280"));
+
+        // Tabs for Patient/Doctor
+        ToggleGroup roleToggle = new ToggleGroup();
+        ToggleButton patientTab = new ToggleButton("Patient");
+        ToggleButton doctorTab = new ToggleButton("Doctor");
+        patientTab.setToggleGroup(roleToggle);
+        doctorTab.setToggleGroup(roleToggle);
+        patientTab.setSelected(true);
+        styleTab(patientTab, true);
+        styleTab(doctorTab, false);
+        HBox tabs = new HBox(patientTab, doctorTab);
+        tabs.setAlignment(Pos.CENTER);
+        tabs.setSpacing(8);
+
+        // Login fields
+        TextField emailField = new TextField();
+        emailField.setPromptText("Enter your email address");
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Enter your password");
+
+        Button signInBtn = new Button("Sign In as Patient");
+        signInBtn.setMaxWidth(Double.MAX_VALUE);
+        signInBtn.setStyle("-fx-background-color: #111827; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 24 10 24;");
+
+        Label errorLabel = new Label();
+        errorLabel.setTextFill(Color.web("#ef4444"));
+        errorLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        errorLabel.setVisible(false);
+
+        // Switch button text and logic based on tab
+        roleToggle.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (newToggle == patientTab) {
+                signInBtn.setText("Sign In as Patient");
+            } else {
+                signInBtn.setText("Sign In as Doctor");
+            }
+        });
+
+        signInBtn.setOnAction(event -> {
+            errorLabel.setVisible(false);
+            String email = emailField.getText().trim();
+            String password = passwordField.getText();
+            String role = patientTab.isSelected() ? "patient" : "doctor";
+            try {
+                Connection conn = DatabaseManager.getConnection();
+                if (conn != null) {
+                    String sql = "SELECT * FROM users WHERE email = ? AND password = ? AND role = ?";
+                    PreparedStatement stmt = conn.prepareStatement(sql);
+                    stmt.setString(1, email);
+                    stmt.setString(2, password);
+                    stmt.setString(3, role);
+                    ResultSet rs = stmt.executeQuery();
+                    if (rs.next()) {
+                        int userId = rs.getInt("user_id");
+                        String username = rs.getString("username");
+                        String firstName = rs.getString("username"); // fallback if no first_name
+                        // Try to get first/last name from patients/doctors table
+                        if (role.equals("patient")) {
+                            String pSql = "SELECT first_name FROM patients WHERE user_id = ?";
+                            PreparedStatement pStmt = conn.prepareStatement(pSql);
+                            pStmt.setInt(1, userId);
+                            ResultSet prs = pStmt.executeQuery();
+                            if (prs.next()) firstName = prs.getString("first_name");
+                        } else {
+                            String dSql = "SELECT first_name FROM doctors WHERE user_id = ?";
+                            PreparedStatement dStmt = conn.prepareStatement(dSql);
+                            dStmt.setInt(1, userId);
+                            ResultSet drs = dStmt.executeQuery();
+                            if (drs.next()) firstName = drs.getString("first_name");
+                        }
+                        // Login successful, redirect to dashboard
+                        if (role.equals("patient")) {
+                            PatientDashboard dashboard = new PatientDashboard(userId, firstName);
+                            dashboard.start(primaryStage);
+                        } else {
+                            DoctorDashboard dashboard = new DoctorDashboard(userId, firstName);
+                            dashboard.start(primaryStage);
+                        }
+                    } else {
+                        errorLabel.setText("Invalid credentials.");
+                        errorLabel.setVisible(true);
+                    }
+                }
+            } catch (Exception ex) {
+                errorLabel.setText("Error: " + ex.getMessage());
+                errorLabel.setVisible(true);
+                ex.printStackTrace();
+            }
+        });
+
+        // Forgot password link
+        HBox passwordRow = new HBox();
+        passwordRow.setAlignment(Pos.CENTER_RIGHT);
+        Hyperlink forgot = new Hyperlink("Forgot password?");
+        forgot.setStyle("-fx-text-fill: #2563eb; -fx-font-size: 13;");
+        passwordRow.getChildren().add(forgot);
+
+        // Signup prompt
+        HBox signupPrompt = new HBox(4);
+        signupPrompt.setAlignment(Pos.CENTER);
+        Label noAccount = new Label("Don't have an account?");
+        noAccount.setFont(Font.font("Segoe UI", 14));
+        noAccount.setTextFill(Color.web("#6b7280"));
+        Hyperlink signupBtn = new Hyperlink("Create one now");
+        signupBtn.setStyle("-fx-text-fill: #2563eb; -fx-font-weight: bold;");
+        signupBtn.setOnAction(signupEvent -> {
+            ModernSignupPage signupPage = new ModernSignupPage();
+            signupPage.start(primaryStage);
+        });
+        signupPrompt.getChildren().addAll(noAccount, signupBtn);
+
+        loginArea.getChildren().addAll(title, subtitle, tabs, emailField, passwordField, signInBtn, errorLabel, passwordRow, signupPrompt);
+
+        // Center the login card in the scene
+        StackPane root = new StackPane(loginArea);
+        root.setStyle("-fx-background-color: linear-gradient(to bottom, #f8fafc, #e0e7ef);");
+        root.setPrefSize(1300, 900);
+
+        Scene scene = new Scene(root, 1300, 800);
+        primaryStage.setTitle("Login Page");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private void styleTab(ToggleButton tab, boolean selected) {
+        if (selected) {
+            tab.setStyle("-fx-background-color: #fff; -fx-border-color: #2563eb; -fx-border-width: 0 0 2 0; -fx-font-weight: bold; -fx-text-fill: #2563eb; -fx-background-radius: 8 8 0 0; -fx-padding: 8 32 8 32;");
+        } else {
+            tab.setStyle("-fx-background-color: #f1f5f9; -fx-border-width: 0 0 2 0; -fx-text-fill: #6b7280; -fx-background-radius: 8 8 0 0; -fx-padding: 8 32 8 32;");
+        }
+    }
+
+    private void showSignupForm() {
+        VBox signupForm = createSignupForm();
+        StackPane signupRoot = new StackPane(signupForm);
+        signupRoot.setStyle("-fx-background-color: linear-gradient(to bottom, #f8fafc, #e0e7ef);");
+        signupRoot.setPrefSize(1300, 900);
+
+        Scene signupScene = new Scene(signupRoot, 1300, 800);
+        Stage signupStage = new Stage();
+        signupStage.setTitle("Sign Up");
+        signupStage.setScene(signupScene);
+        signupStage.show();
+    }
+
+    private VBox createSignupForm() {
+        VBox form = new VBox(16);
+        form.setPadding(new Insets(24, 24, 24, 24));
+        form.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e0e0e0, 4, 0, 0, 2);");
+
+        Label title = new Label("Create Account");
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 24));
+
+        // Name fields
+        HBox nameFields = new HBox(12);
+        TextField firstNameField = new TextField();
+        firstNameField.setPromptText("First Name");
+        TextField lastNameField = new TextField();
+        lastNameField.setPromptText("Last Name");
+        nameFields.getChildren().addAll(firstNameField, lastNameField);
+
+        // Email and Password
+        TextField emailField = new TextField();
+        emailField.setPromptText("Email");
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Password");
+
+        // Role selection
+        ToggleGroup roleGroup = new ToggleGroup();
+        HBox roleBox = new HBox(12);
+        RadioButton patientTab = new RadioButton("Patient");
+        RadioButton doctorTab = new RadioButton("Doctor");
+        patientTab.setToggleGroup(roleGroup);
+        doctorTab.setToggleGroup(roleGroup);
+        patientTab.setSelected(true);
+        roleBox.getChildren().addAll(patientTab, doctorTab);
+
+        // Doctor-specific fields (initially hidden)
+        VBox doctorFields = new VBox(12);
+        doctorFields.setVisible(false);
+        
+        // Specialization dropdown
+        ComboBox<String> specializationCombo = new ComboBox<>();
+        specializationCombo.setPromptText("Select Specialization");
+        specializationCombo.getItems().addAll(
+            "Cardiology",
+            "Dermatology",
+            "Neurology",
+            "Pediatrics",
+            "Ophthalmology",
+            "General Medicine",
+            "Orthopedics",
+            "Gynecology",
+            "ENT",
+            "Psychiatry",
+            "Dentistry",
+            "Urology"
+        );
+        specializationCombo.setPrefWidth(200);
+        
+        // Phone number
+        TextField phoneField = new TextField();
+        phoneField.setPromptText("Phone Number");
+        
+        doctorFields.getChildren().addAll(
+            new Label("Specialization:"),
+            specializationCombo,
+            new Label("Phone Number:"),
+            phoneField
+        );
+
+        // Patient-specific fields
+        VBox patientFields = new VBox(12);
+        DatePicker dobPicker = new DatePicker();
+        dobPicker.setPromptText("Date of Birth");
+        ComboBox<String> genderCombo = new ComboBox<>();
+        genderCombo.setPromptText("Gender");
+        genderCombo.getItems().addAll("Male", "Female", "Other");
+        TextField addressField = new TextField();
+        addressField.setPromptText("Address");
+        TextArea medicalHistoryArea = new TextArea();
+        medicalHistoryArea.setPromptText("Medical History");
+        medicalHistoryArea.setPrefRowCount(3);
+        patientFields.getChildren().addAll(
+            new Label("Date of Birth:"),
+            dobPicker,
+            new Label("Gender:"),
+            genderCombo,
+            new Label("Address:"),
+            addressField,
+            new Label("Medical History:"),
+            medicalHistoryArea
+        );
+
+        // Show/hide fields based on role
+        roleGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            boolean isDoctor = doctorTab.isSelected();
+            doctorFields.setVisible(isDoctor);
+            patientFields.setVisible(!isDoctor);
+        });
+
+        // Signup button
+        Button signupBtn = new Button("Sign Up");
+        signupBtn.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 12 0 12 0;");
+        signupBtn.setMaxWidth(Double.MAX_VALUE);
+
+        // Error label
+        Label errorLabel = new Label();
+        errorLabel.setTextFill(Color.RED);
+        errorLabel.setVisible(false);
+
+        // Signup action
+        signupBtn.setOnAction(e -> {
+            errorLabel.setVisible(false);
+            String firstName = firstNameField.getText().trim();
+            String lastName = lastNameField.getText().trim();
+            String email = emailField.getText().trim();
+            String password = passwordField.getText();
+            String role = doctorTab.isSelected() ? "doctor" : "patient";
+
+            // Validate required fields
+            if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                errorLabel.setText("Please fill in all required fields");
+                errorLabel.setVisible(true);
+                return;
+            }
+
+            try {
+                if (role.equals("doctor")) {
+                    String specialization = specializationCombo.getValue();
+                    String phoneNumber = phoneField.getText().trim();
+                    
+                    if (specialization == null || phoneNumber.isEmpty()) {
+                        errorLabel.setText("Please fill in all doctor-specific fields");
+                        errorLabel.setVisible(true);
+                        return;
+                    }
+
+                    DatabaseManager.signupUser(
+                        email, password, email, role,
+                        firstName, lastName, LocalDate.now(), "Other",
+                        phoneNumber, "", "",
+                        specialization
+                    );
+                } else {
+                    LocalDate dob = dobPicker.getValue();
+                    String gender = genderCombo.getValue();
+                    String address = addressField.getText().trim();
+                    String medicalHistory = medicalHistoryArea.getText().trim();
+
+                    if (dob == null || gender == null || address.isEmpty()) {
+                        errorLabel.setText("Please fill in all patient-specific fields");
+                        errorLabel.setVisible(true);
+                        return;
+                    }
+
+                    DatabaseManager.signupUser(
+                        email, password, email, role,
+                        firstName, lastName, dob, gender,
+                        "", address, medicalHistory,
+                        ""
+                    );
+                }
+
+                // Show success message and close signup window
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Success");
+                alert.setHeaderText(null);
+                alert.setContentText("Account created successfully! Please login.");
+                alert.showAndWait();
+                
+                // Close the signup window
+                Stage currentStage = (Stage) signupBtn.getScene().getWindow();
+                currentStage.close();
+
+            } catch (Exception ex) {
+                errorLabel.setText("Error creating account: " + ex.getMessage());
+                errorLabel.setVisible(true);
+                ex.printStackTrace();
+            }
+        });
+
+        form.getChildren().addAll(
+            title, nameFields, emailField, passwordField, roleBox,
+            doctorFields, patientFields, signupBtn, errorLabel
+        );
+
+        return form;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+} 
