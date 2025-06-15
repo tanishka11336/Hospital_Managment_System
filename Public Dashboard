@@ -1,0 +1,100 @@
+import javax.swing.*;
+import java.awt.*;
+
+public class Dashboard extends JFrame {
+
+    public Dashboard(String role, String name) {
+        setTitle(role + " Dashboard");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1000, 700);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Sidebar
+        JPanel sidebar = new JPanel();
+        sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
+        sidebar.setBackground(new Color(245, 248, 255));
+        sidebar.setPreferredSize(new Dimension(200, getHeight()));
+
+        JLabel appTitle = new JLabel("Hospital System");
+        appTitle.setFont(new Font("Arial", Font.BOLD, 16));
+        appTitle.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 10));
+        sidebar.add(appTitle);
+
+        JLabel roleLabel = new JLabel(role + " Portal");
+        roleLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        roleLabel.setBorder(BorderFactory.createEmptyBorder(0, 20, 20, 10));
+        sidebar.add(roleLabel);
+
+        String[] navItems = {"Dashboard", "Appointments", "Prescriptions", "Profile", "Settings"};
+        for (String item : navItems) {
+            JButton navBtn = new JButton(item);
+            navBtn.setFocusPainted(false);
+            navBtn.setHorizontalAlignment(SwingConstants.LEFT);
+            navBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+            navBtn.setBackground(Color.WHITE);
+            navBtn.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 10));
+            sidebar.add(navBtn);
+        }
+
+        JButton logout = new JButton("⎋ Logout");
+        logout.setForeground(Color.WHITE);
+        logout.setBackground(new Color(220, 53, 69));
+        logout.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        logout.setFocusPainted(false);
+        logout.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 10));
+        sidebar.add(Box.createVerticalGlue());
+        sidebar.add(logout);
+
+        // Main Panel
+        JPanel main = new JPanel();
+        main.setLayout(new BorderLayout());
+        main.setBackground(Color.WHITE);
+        main.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel welcome = new JLabel("Welcome, " + name);
+        welcome.setFont(new Font("Arial", Font.BOLD, 24));
+
+        JPanel stats = new JPanel(new GridLayout(1, 3, 20, 0));
+        stats.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+
+        stats.add(createStatCard("Upcoming Appointments", "2", "Next: May 10"));
+        stats.add(createStatCard("Medical Records", "7", "Updated: Apr 28"));
+        stats.add(createStatCard("Completed Visits", "12", "This year"));
+
+        main.add(welcome, BorderLayout.NORTH);
+        main.add(stats, BorderLayout.CENTER);
+
+        add(sidebar, BorderLayout.WEST);
+        add(main, BorderLayout.CENTER);
+        setVisible(true);
+    }
+
+    private JPanel createStatCard(String title, String value, String sub) {
+        JPanel card = new JPanel();
+        card.setBackground(new Color(245, 249, 255));
+        card.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        JLabel valueLabel = new JLabel(value);
+        valueLabel.setFont(new Font("Arial", Font.BOLD, 22));
+        JLabel subLabel = new JLabel(sub);
+        subLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        subLabel.setForeground(Color.GRAY);
+
+        card.add(titleLabel);
+        card.add(Box.createVerticalStrut(10));
+        card.add(valueLabel);
+        card.add(Box.createVerticalStrut(5));
+        card.add(subLabel);
+
+        return card;
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new Dashboard("Patient", "John"));
+    }
+}
