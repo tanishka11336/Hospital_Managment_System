@@ -1,0 +1,312 @@
+import javafx.application.Application;
+import javafx.geometry.*;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+import java.time.LocalDate;
+import java.util.*;
+//import PatientDashboard;
+//import PrescriptionsPage;
+//import BookedAppointmentsPage;
+//import HomePage;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import database.DatabaseManager;
+import database.AppointmentManager;
+import javafx.collections.FXCollections;
+import database.PatientManager;
+
+public class BookAppointmentPage extends Application {
+    // Dummy doctor data class
+    static class Doctor {
+        int doctorId;
+        String name, specialty, experience, imgUrl;
+        double rating;
+        Set<LocalDate> availableDates;
+        Doctor(int doctorId, String name, String specialty, String experience, double rating, String imgUrl, Set<LocalDate> availableDates) {
+            this.doctorId = doctorId;
+            this.name = name;
+            this.specialty = specialty;
+            this.experience = experience;
+            this.rating = rating;
+            this.imgUrl = imgUrl;
+            this.availableDates = availableDates;
+        }
+    }
+
+
+    private final int patientId;
+    private final String patientName;
+    private LocalDate selectedDate;
+    public BookAppointmentPage(int patientId, String patientName) {
+        this.patientId = patientId;
+        this.patientName = patientName;
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Sidebar
+        VBox sidebar = new VBox(20);
+        sidebar.setPadding(new Insets(30, 0, 30, 0));
+        sidebar.setPrefWidth(240);
+        sidebar.setStyle("-fx-background-color: #f5f7fa; -fx-border-color: #e0e0e0; -fx-border-width: 0 1 0 0;");
+
+        Label logo = new Label("Healthcare System\nPatient Portal");
+        logo.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+        logo.setTextAlignment(TextAlignment.CENTER);
+        logo.setAlignment(Pos.CENTER);
+        logo.setPadding(new Insets(0, 0, 20, 0));
+        sidebar.getChildren().add(logo);
+
+        sidebar.getChildren().add(createSidebarItem("Dashboard", "\uD83D\uDCC5", false, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Book Appointment", "\u23F0", true, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Appointment History", "\uD83D\uDCC6", false, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Prescriptions", "\uD83D\uDC8A", false, primaryStage));
+        sidebar.getChildren().add(new VBox()); // Spacer
+
+        Button logoutBtn = new Button("\u21B7  Logout");
+        logoutBtn.setStyle("-fx-background-color: #ff5252; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 0 10 0;");
+        logoutBtn.setPrefWidth(200);
+        sidebar.getChildren().add(logoutBtn);
+
+        // Main content (your appointment form)
+        VBox mainContent = new VBox(20);
+        mainContent.setPadding(new Insets(40, 60, 40, 60));
+        Label header = new Label("Create an appointment");
+        header.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+
+        ComboBox<String> specializationCombo = new ComboBox<>();
+        specializationCombo.setPromptText("Select Specialization");
+        ComboBox<String> doctorCombo = new ComboBox<>();
+        doctorCombo.setPromptText("Select Doctor");
+       
+        DatePicker datePicker = new DatePicker();
+        datePicker.setPromptText("Select Date");
+        
+        // Create a VBox to hold both available and booked slots
+        VBox slotsContainer = new VBox(20);
+        Label availableSlotsLabel = new Label("Available Time Slots");
+        availableSlotsLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        ComboBox<String> timeCombo = new ComboBox<>();
+        timeCombo.setPromptText("Select Available Time");
+        
+        Label bookedSlotsLabel = new Label("Booked Time Slots");
+        bookedSlotsLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        ListView<String> bookedSlotsList = new ListView<>();
+        bookedSlotsList.setPrefHeight(150);
+        bookedSlotsList.setStyle("-fx-background-color: #f8fafc; -fx-background-radius: 8;");
+
+        Button createBtn = new Button("Book Appointment");
+        createBtn.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 20 10 20;");
+
+        TextField feesField = new TextField();
+        feesField.setPromptText("Consultancy Fees");
+        feesField.setEditable(false);
+
+        mainContent.getChildren().addAll(
+            header,
+            new HBox(10, new Label("Specialization:"), specializationCombo),
+            new HBox(10, new Label("Doctors:"), doctorCombo),
+            new HBox(10, new Label("Consultancy Fees:"), feesField),
+            new HBox(10, new Label("Appointment Date:"), datePicker),
+            slotsContainer
+        );
+
+        // Add slots section to the container
+        slotsContainer.getChildren().addAll(
+            availableSlotsLabel,
+            timeCombo,
+            bookedSlotsLabel,
+            bookedSlotsList,
+            createBtn
+        );
+
+        // Layout
+        HBox rootLayout = new HBox(sidebar, mainContent);
+        HBox.setHgrow(mainContent, Priority.ALWAYS);
+        Scene scene = new Scene(rootLayout, 900, 600);
+        primaryStage.setScene(scene);
+        primaryStage.setTitle("Book Appointment");
+        primaryStage.show();
+
+        // --- Populate Specializations ---
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT DISTINCT specialization FROM doctors")) {
+            ResultSet rs = stmt.executeQuery();
+            List<String> specs = new ArrayList<>();
+            while (rs.next()) {
+                specs.add(rs.getString("specialization"));
+            }
+            specializationCombo.setItems(FXCollections.observableArrayList(specs));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        // --- Populate Doctors when specialization is selected ---
+        specializationCombo.setOnAction(e -> {
+            String spec = specializationCombo.getValue();
+            try (Connection conn = DatabaseManager.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement("SELECT doctor_id, first_name, last_name FROM doctors WHERE specialization = ?")) {
+                stmt.setString(1, spec);
+                ResultSet rs = stmt.executeQuery();
+                List<String> doctors = new ArrayList<>();
+                while (rs.next()) {
+                    String doc = rs.getInt("doctor_id") + ": " + rs.getString("first_name") + " " + rs.getString("last_name");
+                    doctors.add(doc);
+                }
+                doctorCombo.setItems(FXCollections.observableArrayList(doctors));
+            } catch (Exception ex2) {
+                ex2.printStackTrace();
+            }
+        });
+
+        // When doctor is selected, fill fees and clear time/date
+        doctorCombo.setOnAction(e -> {
+            String docStr = doctorCombo.getValue();
+            if (docStr == null) return;
+            int doctorId = Integer.parseInt(docStr.split(":")[0]);
+            try (Connection conn = DatabaseManager.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement("SELECT consultancy_fees FROM doctors WHERE doctor_id = ?")) {
+                stmt.setInt(1, doctorId);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    feesField.setText(rs.getString("consultancy_fees"));
+                }
+            } catch (Exception ex2) {
+                ex2.printStackTrace();
+            }
+            datePicker.setValue(null);
+            timeCombo.getItems().clear();
+        });
+
+        // When date is picked, populate only truly available slots
+        datePicker.setOnAction(e -> {
+            String docStr = doctorCombo.getValue();
+            LocalDate date = datePicker.getValue();
+            if (docStr == null || date == null) return;
+
+            int doctorId = Integer.parseInt(docStr.split(":")[0]);
+            List<String> availableTimes = new ArrayList<>();
+            Map<String, Integer> timeToSlotId = new HashMap<>();
+            try (Connection conn = DatabaseManager.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT slot_id, slot_time FROM doctor_available_slots WHERE doctor_id = ? AND slot_date = ? AND is_booked = FALSE"
+                 )) {
+                stmt.setInt(1, doctorId);
+                stmt.setDate(2, java.sql.Date.valueOf(date));
+                ResultSet rs = stmt.executeQuery();
+                while (rs.next()) {
+                    String slotTime = rs.getString("slot_time");
+                    availableTimes.add(slotTime);
+                    timeToSlotId.put(slotTime, rs.getInt("slot_id"));
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+
+            timeCombo.getItems().clear();
+            timeCombo.setItems(FXCollections.observableArrayList(availableTimes));
+            if (availableTimes.isEmpty()) {
+                timeCombo.setPromptText("No available slots for this date");
+            } else {
+                timeCombo.setPromptText("Select Available Time");
+            }
+
+            // Store the slotId map for use when booking
+            timeCombo.setUserData(timeToSlotId);
+        });
+
+        // On createBtn click, store appointment in DB
+        createBtn.setOnAction(e -> {
+            String docStr = doctorCombo.getValue();
+            LocalDate date = datePicker.getValue();
+            String time = timeCombo.getValue();
+            
+            if (docStr == null || date == null || time == null) {
+                showAlert("Please select all fields.");
+                return;
+            }
+            
+            // Get the slotId from the map
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> timeToSlotId = (Map<String, Integer>) timeCombo.getUserData();
+            Integer slotId = timeToSlotId.get(time);
+            
+            if (slotId == null) {
+                showAlert("Selected slot is not available.");
+                return;
+            }
+            
+            int doctorId = Integer.parseInt(docStr.split(":")[0]);
+            Map<String, Object> result = AppointmentManager.bookSlotAndCreateAppointment(patientId, doctorId, slotId, "Routine Checkup");
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                showAlert("Appointment booked successfully!");
+                datePicker.fireEvent(new javafx.event.ActionEvent());
+            } else {
+                showAlert("Failed to book appointment: " + result.get("message"));
+            }
+        });
+
+        // Example: Always fetch fresh data in start()
+        List<Map<String, Object>> appointments = AppointmentManager.getPatientAppointments(patientId);
+        // ... update your TableView or ListView with this data ...
+
+        List<Map<String, Object>> patients = PatientManager.getAllPatients(); // or similar
+        // ... update your TableView or ListView with this data ...
+    }
+
+    private void showAlert(String msg) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Info");
+        alert.setHeaderText(null);
+        alert.setContentText(msg);
+        alert.showAndWait();
+    }
+
+    // Sidebar item helper
+    private HBox createSidebarItem(String text, String icon, boolean active, Stage primaryStage) {
+        HBox box = new HBox(16);
+        box.setAlignment(Pos.CENTER_LEFT);
+        box.setPadding(new Insets(8, 0, 8, 32));
+        if (active) {
+            box.setStyle("-fx-background-color: #e9f1ff; -fx-background-radius: 8 0 0 8;");
+        }
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Times New Roman", 22));
+        Label textLabel = new Label(text);
+        textLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 18));
+        box.getChildren().addAll(iconLabel, textLabel);
+
+        // Navigation logic
+        if (text.equals("Dashboard")) {
+            box.setOnMouseClicked(e -> {
+                // Replace with your dashboard page class
+                PatientDashboard dashboardPage = new PatientDashboard(patientId, patientName);
+                try { dashboardPage.start(primaryStage); } catch (Exception ex) { ex.printStackTrace(); }
+            });
+        } else if (text.equals("Book Appointment")) {
+            // Already on this page
+        } else if (text.equals("Appointment History")) {
+            box.setOnMouseClicked(e -> {
+                BookedAppointmentsPage historyPage = new BookedAppointmentsPage(patientId, patientName);
+                try { historyPage.start(primaryStage); } catch (Exception ex) { ex.printStackTrace(); }
+            });
+        } else if (text.equals("Prescriptions")) {
+            box.setOnMouseClicked(e -> {
+                PrescriptionsPage presPage = new PrescriptionsPage(patientId, patientName);
+                try { presPage.start(primaryStage); } catch (Exception ex) { ex.printStackTrace(); }
+            });
+        }
+        return box;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
