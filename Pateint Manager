@@ -1,0 +1,24 @@
+package database;
+import java.sql.*;
+import java.util.*;
+
+public class PatientManager {
+    public static List<Map<String, Object>> getAllPatients() {
+        List<Map<String, Object>> patients = new ArrayList<>();
+        try (Connection conn = DatabaseManager.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM patients")) {
+            while (rs.next()) {
+                Map<String, Object> patient = new HashMap<>();
+                patient.put("patient_id", rs.getInt("patient_id"));
+                patient.put("first_name", rs.getString("first_name"));
+                patient.put("last_name", rs.getString("last_name"));
+                // Add more fields as needed
+                patients.add(patient);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return patients;
+    }
+}
