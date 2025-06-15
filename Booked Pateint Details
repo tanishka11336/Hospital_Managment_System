@@ -1,0 +1,231 @@
+import javafx.application.Application;
+import javafx.geometry.*;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+import java.time.LocalDate;
+import java.util.*;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import database.AppointmentManager;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import database.DatabaseConnection;
+//import src.DoctorDashboard;
+//import src.DoctorSchedule;
+
+public class PatientsPage extends Application {
+    private int doctorId;
+    private String firstName;
+
+    public PatientsPage(int doctorId, String firstName) {
+        this.doctorId = doctorId;
+        this.firstName = firstName;
+    }
+
+    /*private int getDoctorIdFromUserId(int userId) {
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT doctor_id FROM doctors WHERE user_id = ?")) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("doctor_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Return -1 if not found
+    }*/
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Sidebar (reuse style)
+        VBox sidebar = new VBox(20);
+        sidebar.setPadding(new Insets(30, 0, 30, 0));
+        sidebar.setPrefWidth(240);
+        sidebar.setStyle("-fx-background-color: #f5f7fa; -fx-border-color: #e0e0e0; -fx-border-width: 0 1 0 0;");
+
+        Label logo = new Label("Hospital System\nDoctor Portal");
+        logo.setFont(Font.font("Times New Roman", FontWeight.BOLD, 22));
+        logo.setTextAlignment(TextAlignment.CENTER);
+        logo.setAlignment(Pos.CENTER);
+        logo.setPadding(new Insets(0, 0, 20, 0));
+        sidebar.getChildren().add(logo);
+
+        sidebar.getChildren().add(createSidebarItem("Dashboard", "\uD83D\uDCC5", false, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("My Schedule", "\u23F0", false, primaryStage));
+        sidebar.getChildren().add(createSidebarItem("Patients", "\uD83D\uDC65", true, primaryStage));
+        sidebar.getChildren().add(new VBox()); // Spacer
+
+        Button logoutBtn = new Button("\u21B7  Logout");
+        logoutBtn.setStyle("-fx-background-color: #ff5252; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 0 10 0;");
+        logoutBtn.setPrefWidth(200);
+        sidebar.getChildren().add(logoutBtn);
+
+        // Main content
+        VBox mainContent = new VBox(30);
+        mainContent.setPadding(new Insets(40, 60, 40, 60));
+        mainContent.setStyle("-fx-background-color: #f6f8fc;");
+
+        Label header = new Label("Patients");
+        header.setFont(Font.font("Times New Roman", FontWeight.BOLD, 28));
+        header.setPadding(new Insets(0, 0, 10, 0));
+
+        TableView<Map<String, String>> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPrefHeight(500);
+
+        TableColumn<Map<String, String>, String> nameCol = new TableColumn<>("Patient Name");
+        nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().get("name")));
+        TableColumn<Map<String, String>, String> dateCol = new TableColumn<>("Booking Date");
+        dateCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().get("appointment_date")));
+        TableColumn<Map<String, String>, String> timeCol = new TableColumn<>("Booking Time");
+        timeCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().get("appointment_time")));
+        TableColumn<Map<String, String>, Void> actionCol = new TableColumn<>("Action");
+        actionCol.setCellFactory(col -> new TableCell<>() {
+            private final Button editBtn = new Button("Edit");
+            {
+                editBtn.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+                editBtn.setOnAction(e -> {
+                    Map<String, String> row = getTableView().getItems().get(getIndex());
+                    showEditDialog(row, table);
+                });
+            }
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(editBtn);
+                }
+            }
+        });
+        table.getColumns().addAll(nameCol, dateCol, timeCol, actionCol);
+
+        // Fetch real appointments for the doctor from the database
+        // You may need to implement getDoctorAppointments in AppointmentManager
+        List<Map<String, Object>> dbAppointments = AppointmentManager.getDoctorAppointments(doctorId);
+        List<Map<String, String>> appointments = new ArrayList<>();
+        for (Map<String, Object> dbMap : dbAppointments) {
+            Map<String, String> stringMap = new HashMap<>();
+            for (Map.Entry<String, Object> entry : dbMap.entrySet()) {
+                stringMap.put(entry.getKey(), entry.getValue() == null ? "" : entry.getValue().toString());
+            }
+            appointments.add(stringMap);
+        }
+
+        // Set table data
+        table.getItems().clear();
+        table.getItems().addAll(appointments);
+
+        mainContent.getChildren().addAll(header, table);
+
+        HBox root = new HBox(sidebar, mainContent);
+        HBox.setHgrow(mainContent, Priority.ALWAYS);
+
+        Scene scene = new Scene(root, 1300, 800);
+        primaryStage.setScene(scene);
+        primaryStage.setTitle("Patients");
+        primaryStage.setResizable(false);
+        primaryStage.show();
+    }
+
+    private Map<String, String> createPatient(String name, String date, String time) {
+        Map<String, String> map = new HashMap<>();
+        map.put("name", name);
+        map.put("date", date);
+        map.put("time", time);
+        return map;
+    }
+
+    private void showEditDialog(Map<String, String> row, TableView<Map<String, String>> table) {
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Edit Appointment");
+        dialog.setHeaderText("Edit or delete appointment for " + row.get("name"));
+        ButtonType deleteBtn = new ButtonType("Delete", ButtonBar.ButtonData.LEFT);
+        ButtonType rescheduleBtn = new ButtonType("Reschedule", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(deleteBtn, rescheduleBtn, cancelBtn);
+
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
+        String dateStr = row.get("appointment_date");
+        if (dateStr == null || dateStr.isEmpty()) dateStr = LocalDate.now().toString();
+        DatePicker datePicker = new DatePicker(LocalDate.parse(dateStr));
+        TextField timeField = new TextField(row.get("appointment_time"));
+        content.getChildren().addAll(new Label("Date:"), datePicker, new Label("Time:"), timeField);
+        dialog.getDialogPane().setContent(content);
+
+        dialog.setResultConverter(btn -> {
+            if (btn == deleteBtn) return "delete";
+            if (btn == rescheduleBtn) return "reschedule";
+            return null;
+        });
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(action -> {
+            if (action.equals("delete")) {
+                table.getItems().remove(row);
+            } else if (action.equals("reschedule")) {
+                row.put("date", datePicker.getValue().toString());
+                row.put("time", timeField.getText());
+                table.refresh();
+            }
+        });
+    }
+
+    private HBox createSidebarItem(String text, String icon, boolean active, Stage primaryStage) {
+        HBox box = new HBox(16);
+        box.setAlignment(Pos.CENTER_LEFT);
+        box.setPadding(new Insets(8, 0, 8, 32));
+        if (active) {
+            box.setStyle("-fx-background-color: #e9f1ff; -fx-background-radius: 8 0 0 8;");
+        }
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Times New Roman", 22));
+        Label textLabel = new Label(text);
+        textLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 18));
+        box.getChildren().addAll(iconLabel, textLabel);
+
+        // Navigation logic
+        if (text.equals("Dashboard")) {
+            box.setOnMouseClicked(e -> {
+                DoctorDashboard dashboardPage = new DoctorDashboard(doctorId, firstName);
+                try {
+                    dashboardPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        } else if (text.equals("My Schedule")) {
+            box.setOnMouseClicked(e -> {
+                DoctorSchedule schedulePage = new DoctorSchedule(doctorId, firstName);
+                try {
+                    schedulePage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        } else if (text.equals("Patients")) {
+            box.setOnMouseClicked(e -> {
+                PatientsPage patientsPage = new PatientsPage(doctorId, firstName);
+                try {
+                    patientsPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            });
+        }
+        // Add similar logic for other navigation items if needed
+
+        return box;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+} 
