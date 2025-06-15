@@ -1,0 +1,279 @@
+import javafx.application.Application;
+import javafx.geometry.*;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+//import src.HomePage;
+//import src.ModernLoginPage;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import database.DatabaseManager;
+import java.time.LocalDate;
+
+public class ModernSignupPage extends Application {
+    private String selectedRole = "Patient";
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Main container
+        VBox mainContainer = new VBox(12);
+        mainContainer.setAlignment(Pos.CENTER);
+        mainContainer.setPadding(new Insets(40));
+        mainContainer.setMaxWidth(500);
+        mainContainer.setStyle("-fx-background-color: #fff; -fx-background-radius: 16; -fx-border-color: #e0e0e0; -fx-border-width: 1.2; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 8, 0, 0, 2);");
+
+        // Title
+        Label title = new Label("Create Account");
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 28));
+        Label subtitle = new Label("Fill in your details to get started");
+        subtitle.setFont(Font.font("Segoe UI", 16));
+        subtitle.setTextFill(Color.web("#6b7280"));
+
+        // Tabs for Patient/Doctor
+        ToggleGroup roleToggle = new ToggleGroup();
+        ToggleButton patientTab = new ToggleButton("Patient");
+        ToggleButton doctorTab = new ToggleButton("Doctor");
+        patientTab.setToggleGroup(roleToggle);
+        doctorTab.setToggleGroup(roleToggle);
+        patientTab.setSelected(true);
+        styleTab(patientTab, true);
+        styleTab(doctorTab, false);
+        HBox tabs = new HBox(patientTab, doctorTab);
+        tabs.setAlignment(Pos.CENTER);
+        tabs.setSpacing(8);
+
+        // Form fields
+        TextField firstNameField = new TextField();
+        firstNameField.setPromptText("First Name");
+        TextField lastNameField = new TextField();
+        lastNameField.setPromptText("Last Name");
+        TextField emailField = new TextField();
+        emailField.setPromptText("Email Address");
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Password");
+
+        // Form fields
+        VBox commonFields = new VBox(12); // Reduced spacing from 24 to 12  it is use to change the spaces of the box fields 
+        commonFields.getChildren().addAll(
+            firstNameField,
+            lastNameField,
+            emailField,
+            passwordField
+        );
+
+        // Doctor-specific fields (initially hidden)
+        VBox doctorFields = new VBox(12);
+        doctorFields.setVisible(false);
+        
+        // Specialization dropdown
+        ComboBox<String> specializationCombo = new ComboBox<>();
+        specializationCombo.setPromptText("Select Specialization");
+        specializationCombo.getItems().addAll(
+            "Cardiology",
+            "Dermatology",
+            "Neurology",
+            "Pediatrics",
+            "Ophthalmology",
+            "General Medicine",
+            "Orthopedics",
+            "Gynecology",
+            "ENT",
+            "Psychiatry",
+            "Dentistry",
+            "Urology"
+        );
+        specializationCombo.setPrefWidth(200);
+        
+        // Phone number
+        TextField phoneField = new TextField();
+        phoneField.setPromptText("Phone Number");
+        
+        doctorFields.getChildren().addAll(
+            new Label("Specialization:"),
+            specializationCombo,
+            new Label("Phone Number:"),
+            phoneField
+        );
+
+        // Patient-specific fields
+        VBox patientFields = new VBox(12);
+        DatePicker dobPicker = new DatePicker();
+        dobPicker.setPromptText("Date of Birth");
+        ComboBox<String> genderCombo = new ComboBox<>();
+        genderCombo.setPromptText("Gender");
+        genderCombo.getItems().addAll("Male", "Female", "Other");
+        TextField addressField = new TextField();
+        addressField.setPromptText("Address");
+        TextArea medicalHistoryArea = new TextArea();
+        medicalHistoryArea.setPromptText("Medical History");
+        medicalHistoryArea.setPrefRowCount(3);
+        patientFields.getChildren().addAll(
+            new Label("Date of Birth:"),
+            dobPicker,
+            new Label("Gender:"),
+            genderCombo,
+            new Label("Address:"),
+            addressField,
+            new Label("Medical History:"),
+            medicalHistoryArea
+        );
+
+        // Show/hide fields based on role
+        roleToggle.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            boolean isDoctor = doctorTab.isSelected();
+            doctorFields.setVisible(isDoctor);
+            patientFields.setVisible(!isDoctor);
+            styleTab(patientTab, !isDoctor);
+            styleTab(doctorTab, isDoctor);
+        });
+
+        // Signup button
+        Button signupBtn = new Button("Create Account");
+        signupBtn.setMaxWidth(Double.MAX_VALUE);
+        signupBtn.setStyle("-fx-background-color: #111827; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 24 10 24;");
+
+        // Error label
+        Label errorLabel = new Label();
+        errorLabel.setTextFill(Color.web("#ef4444"));
+        errorLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        errorLabel.setVisible(false);
+
+        // Signup action
+        signupBtn.setOnAction(e -> {
+            errorLabel.setVisible(false);
+            String firstName = firstNameField.getText().trim();
+            String lastName = lastNameField.getText().trim();
+            String email = emailField.getText().trim();
+            String password = passwordField.getText();
+            String role = doctorTab.isSelected() ? "doctor" : "patient";
+
+            // Validate required fields
+            if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                errorLabel.setText("Please fill in all required fields");
+                errorLabel.setVisible(true);
+                return;
+            }
+
+            try {
+                if (role.equals("doctor")) {
+                    String specialization = specializationCombo.getValue();
+                    String phoneNumber = phoneField.getText().trim();
+                    
+                    if (specialization == null || phoneNumber.isEmpty()) {
+                        errorLabel.setText("Please fill in all doctor-specific fields");
+                        errorLabel.setVisible(true);
+                        return;
+                    }
+
+                    DatabaseManager.signupUser(
+                        email, password, email, role,
+                        firstName, lastName, LocalDate.now(), "Other",
+                        phoneNumber, "", "",
+                        specialization
+                    );
+                } else {
+                    LocalDate dob = dobPicker.getValue();
+                    String gender = genderCombo.getValue();
+                    String address = addressField.getText().trim();
+                    String medicalHistory = medicalHistoryArea.getText().trim();
+
+                    if (dob == null || gender == null || address.isEmpty()) {
+                        errorLabel.setText("Please fill in all patient-specific fields");
+                        errorLabel.setVisible(true);
+                        return;
+                    }
+
+                    DatabaseManager.signupUser(
+                        email, password, email, role,
+                        firstName, lastName, dob, gender,
+                        "", address, medicalHistory,
+                        ""
+                    );
+                }
+
+                // Show success message and return to login
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Success");
+                alert.setHeaderText(null);
+                alert.setContentText("Account created successfully! Please login.");
+                alert.showAndWait();
+                
+                // Return to login page
+                ModernLoginPage loginPage = new ModernLoginPage();
+                try {
+                    loginPage.start(primaryStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+
+            } catch (Exception ex) {
+                errorLabel.setText("Error creating account: " + ex.getMessage());
+                errorLabel.setVisible(true);
+                ex.printStackTrace();
+            }
+        });
+
+        // Login prompt
+        HBox loginPrompt = new HBox(4);
+        loginPrompt.setAlignment(Pos.CENTER);
+        Label haveAccount = new Label("Already have an account?");
+        haveAccount.setFont(Font.font("Segoe UI", 14));
+        haveAccount.setTextFill(Color.web("#6b7280"));
+        Hyperlink loginBtn = new Hyperlink("Sign in");
+        loginBtn.setStyle("-fx-text-fill: #2563eb; -fx-font-weight: bold;");
+        loginBtn.setOnAction(e -> {
+            try {
+                // Close current window
+                Stage currentStage = (Stage) loginBtn.getScene().getWindow();
+                currentStage.close();
+                
+                // Open login page
+                ModernLoginPage loginPage = new ModernLoginPage();
+                Stage loginStage = new Stage();
+                loginPage.start(loginStage);
+            } catch (Exception ex) {
+                System.err.println("Error navigating to login page: " + ex.getMessage());
+                ex.printStackTrace();
+                
+                // Show error to user
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Navigation Error");
+                alert.setHeaderText(null);
+                alert.setContentText("Failed to open login page. Please try again.");
+                alert.showAndWait();
+            }
+        });
+        loginPrompt.getChildren().addAll(haveAccount, loginBtn);
+
+        mainContainer.getChildren().addAll(
+            title, subtitle, tabs, commonFields,
+            doctorFields, patientFields, signupBtn, errorLabel, loginPrompt
+        );
+
+        // Center the form in the scene
+        StackPane root = new StackPane(mainContainer);
+        root.setStyle("-fx-background-color: linear-gradient(to bottom, #f8fafc, #e0e7ef);");
+        root.setPrefSize(1300, 900);
+
+        Scene scene = new Scene(root, 1300, 800);
+        primaryStage.setTitle("Sign Up");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private void styleTab(ToggleButton tab, boolean selected) {
+        if (selected) {
+            tab.setStyle("-fx-background-color: #fff; -fx-border-color: #2563eb; -fx-border-width: 0 0 2 0; -fx-font-weight: bold; -fx-text-fill: #2563eb; -fx-background-radius: 8 8 0 0; -fx-padding: 8 32 8 32;");
+        } else {
+            tab.setStyle("-fx-background-color: #f1f5f9; -fx-border-width: 0 0 2 0; -fx-text-fill: #6b7280; -fx-background-radius: 8 8 0 0; -fx-padding: 8 32 8 32;");
+        }
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+} 
