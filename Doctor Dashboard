@@ -1,0 +1,474 @@
+import javafx.application.Application;
+import javafx.geometry.*;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+//import src.ModernLoginPage;
+//import src.DoctorSchedule;
+//import src.PatientsPage;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import database.DatabaseConnection;
+
+public class DoctorDashboard extends Application {
+    private int doctorId;
+    private String firstName;
+    public DoctorDashboard(int userId, String firstName) {
+        this.doctorId = getDoctorIdFromUserId(userId);
+        this.firstName = firstName;
+    }
+
+    private int getDoctorIdFromUserId(int userId) {
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT doctor_id FROM doctors WHERE user_id = ?")) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("doctor_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Return -1 if not found
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Sidebar
+        VBox sidebar = new VBox(20);
+        sidebar.setPadding(new Insets(30, 0, 30, 0));
+        sidebar.setPrefWidth(240);
+        sidebar.setStyle("-fx-background-color: #f5f7fa; -fx-border-color: #e0e0e0; -fx-border-width: 0 1 0 0;");
+
+        Label logo = new Label("Hospital System\nDoctor Portal");
+        logo.setFont(Font.font("Times New Roman", FontWeight.BOLD, 22));
+        logo.setTextAlignment(TextAlignment.CENTER);
+        logo.setAlignment(Pos.CENTER);
+        logo.setPadding(new Insets(0, 0, 20, 0));
+        sidebar.getChildren().add(logo);
+
+        // Add navigation to sidebar items
+        Button dashboardBtn = createSidebarItem("Dashboard", "\uD83D\uDCC5", true, primaryStage);
+        Button scheduleBtn = createSidebarItem("My Schedule", "\u23F0", false, primaryStage);
+        Button patientsBtn = createSidebarItem("Patients", "\uD83D\uDC65", false, primaryStage);
+
+        // Add click handlers for navigation
+        scheduleBtn.setOnAction(e -> {
+            DoctorSchedule schedulePage = new DoctorSchedule(doctorId, firstName);
+            try {
+                schedulePage.start(primaryStage);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        patientsBtn.setOnAction(e -> {
+            PatientsPage patientsPage = new PatientsPage(doctorId, firstName);
+            try {
+                patientsPage.start(primaryStage);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        sidebar.getChildren().addAll(dashboardBtn, scheduleBtn, patientsBtn);
+        sidebar.getChildren().add(new VBox()); // Spacer
+
+        Button logoutBtn = new Button("\u21B7  Logout");
+        logoutBtn.setStyle("-fx-background-color: #ff5252; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 10 0 10 0;");
+        logoutBtn.setPrefWidth(200);
+        logoutBtn.setOnAction(e -> {
+            ModernLoginPage loginPage = new ModernLoginPage();
+            try {
+                loginPage.start(primaryStage);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+        sidebar.getChildren().add(logoutBtn);
+
+        // Main content
+        VBox mainContent = new VBox(20);
+        mainContent.setPadding(new Insets(20, 20, 20, 20));
+        mainContent.setStyle("-fx-background-color: #f6f8fc;");
+        HBox.setHgrow(mainContent, Priority.ALWAYS);
+
+        // Header
+        HBox header = new HBox(20);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(0, 0, 20, 0));
+
+        VBox welcomeBox = new VBox(5);
+        Label welcome = new Label("Welcome, Dr. " + firstName);
+        welcome.setFont(Font.font("Times New Roman", FontWeight.BOLD, 28));
+        Label date = new Label("Here's your schedule for today, May 5, 2025");
+        date.setFont(Font.font("Times New Roman", 16));
+        date.setTextFill(Color.GRAY);
+        welcomeBox.getChildren().addAll(welcome, date);
+
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+
+        Button manageBtn = new Button("Manage Schedule");
+        manageBtn.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+        manageBtn.setOnAction(e -> {
+            DoctorSchedule schedulePage = new DoctorSchedule(doctorId, firstName);
+            try {
+                schedulePage.start(primaryStage);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        Button viewPatientsBtn = new Button("View Patients");
+        viewPatientsBtn.setStyle("-fx-background-color: #222; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+        viewPatientsBtn.setOnAction(e -> {
+            PatientsPage patientsPage = new PatientsPage(doctorId, firstName);
+            try {
+                patientsPage.start(primaryStage);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+        HBox actions = new HBox(10, manageBtn, viewPatientsBtn);
+
+        header.getChildren().addAll(welcomeBox, headerSpacer, actions);
+
+        // Stats cards
+        HBox stats = new HBox(20);
+        stats.setAlignment(Pos.CENTER_LEFT);
+        stats.setPadding(new Insets(0, 0, 20, 0));
+        stats.getChildren().addAll(
+                createStatCard("5", "Today's Appointments"),
+                createStatCard("0", "Completed Today"),
+                createStatCard("23", "Upcoming This Week"),
+                createStatCard("2", "Online Consultations")
+        );
+
+        // Schedule section
+        VBox scheduleSection = new VBox(16);
+        scheduleSection.setPadding(new Insets(20, 20, 20, 20));
+        scheduleSection.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e0e0e0, 4, 0, 0, 2);");
+        VBox.setVgrow(scheduleSection, Priority.ALWAYS);
+
+        Label scheduleTitle = new Label("Today's Schedule");
+        scheduleTitle.setFont(Font.font("Times New Roman", FontWeight.BOLD, 22));
+        Label scheduleDate = new Label("Your appointments for today, May 5, 2025");
+        scheduleDate.setFont(Font.font("Times New Roman", 15));
+        scheduleDate.setTextFill(Color.GRAY);
+
+        // Tabs
+        HBox tabs = new HBox(12);
+        tabs.setPadding(new Insets(0, 0, 20, 0));
+        Button allTab = new Button("All (5)");
+        allTab.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+        Button inPersonTab = new Button("In-person (3)");
+        inPersonTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+        Button videoTab = new Button("Video Calls (2)");
+        videoTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+        tabs.getChildren().addAll(allTab, inPersonTab, videoTab);
+
+        // Appointments container
+        VBox appointments = new VBox(14);
+        VBox.setVgrow(appointments, Priority.ALWAYS);
+
+        // Function to update appointments based on selected tab
+        Runnable updateAppointments = () -> {
+            appointments.getChildren().clear();
+            if (allTab.getStyle().contains("#2196f3")) {
+                // Show all appointments
+                appointments.getChildren().addAll(
+                    createAppointmentCard("John Smith", "Checked In", "9:00 AM | In-person", "Annual checkup", "#222"),
+                    createAppointmentCard("Emily Johnson", "Scheduled", "10:30 AM | In-person", "Follow-up consultation", "#2196f3"),
+                    createAppointmentCard("Michael Brown", "Scheduled", "11:00 AM | Video Call", "Initial consultation", "#2196f3"),
+                    createAppointmentCard("Sarah Wilson", "Scheduled", "2:00 PM | In-person", "Follow-up", "#2196f3"),
+                    createAppointmentCard("David Lee", "Scheduled", "3:30 PM | Video Call", "Prescription refill", "#2196f3")
+                );
+            } else if (inPersonTab.getStyle().contains("#2196f3")) {
+                // Show only in-person appointments
+                appointments.getChildren().addAll(
+                    createAppointmentCard("John Smith", "Checked In", "9:00 AM | In-person", "Annual checkup", "#222"),
+                    createAppointmentCard("Emily Johnson", "Scheduled", "10:30 AM | In-person", "Follow-up consultation", "#2196f3"),
+                    createAppointmentCard("Sarah Wilson", "Scheduled", "2:00 PM | In-person", "Follow-up", "#2196f3")
+                );
+            } else if (videoTab.getStyle().contains("#2196f3")) {
+                // Show only video call appointments
+                appointments.getChildren().addAll(
+                    createAppointmentCard("Michael Brown", "Scheduled", "11:00 AM | Video Call", "Initial consultation", "#2196f3"),
+                    createAppointmentCard("David Lee", "Scheduled", "3:30 PM | Video Call", "Prescription refill", "#2196f3")
+                );
+            }
+        };
+
+        // Tab click handlers
+        allTab.setOnAction(e -> {
+            allTab.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+            inPersonTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+            videoTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+            updateAppointments.run();
+        });
+
+        inPersonTab.setOnAction(e -> {
+            allTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+            inPersonTab.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+            videoTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+            updateAppointments.run();
+        });
+
+        videoTab.setOnAction(e -> {
+            allTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+            inPersonTab.setStyle("-fx-background-color: #e9f1ff; -fx-text-fill: #2196f3; -fx-font-weight: bold; -fx-background-radius: 6;");
+            videoTab.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+            updateAppointments.run();
+        });
+
+        // Initial load
+        updateAppointments.run();
+
+        scheduleSection.getChildren().addAll(scheduleTitle, scheduleDate, tabs, appointments);
+
+        mainContent.getChildren().addAll(header, stats, scheduleSection);
+
+        // --- Right Panel: Patient Analytics & Upcoming Tasks ---
+        VBox rightPanel = new VBox(30);
+        rightPanel.setPadding(new Insets(40, 40, 40, 0));
+        rightPanel.setPrefWidth(370);
+        rightPanel.setStyle("-fx-background-color: #f6f8fc;");
+
+        // Patient Analytics Section
+        VBox analyticsSection = new VBox(18);
+        analyticsSection.setPadding(new Insets(24, 24, 24, 24));
+        analyticsSection.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e0e0e0, 4, 0, 0, 2);");
+
+        Label analyticsTitle = new Label("Patient Analytics");
+        analyticsTitle.setFont(Font.font("Times New Roman", FontWeight.BOLD, 24));
+
+        HBox analyticsStats = new HBox(24);
+        VBox totalPatients = new VBox(2);
+        Label totalPatientsLabel = new Label("Total Patients");
+        totalPatientsLabel.setFont(Font.font("Times New Roman", 15));
+        totalPatientsLabel.setTextFill(Color.GRAY);
+        Label totalPatientsValue = new Label("248");
+        totalPatientsValue.setFont(Font.font("Times New Roman", FontWeight.BOLD, 32));
+        totalPatients.getChildren().addAll(totalPatientsLabel, totalPatientsValue);
+        VBox newPatients = new VBox(2);
+        Label newPatientsLabel = new Label("New This Month");
+        newPatientsLabel.setFont(Font.font("Times New Roman", 15));
+        newPatientsLabel.setTextFill(Color.GRAY);
+        Label newPatientsValue = new Label("12");
+        newPatientsValue.setFont(Font.font("Times New Roman", FontWeight.BOLD, 32));
+        newPatients.getChildren().addAll(newPatientsLabel, newPatientsValue);
+        analyticsStats.getChildren().addAll(totalPatients, newPatients);
+
+        // Patient Satisfaction Bar
+        Label satisfactionLabel = new Label("Patient Satisfaction");
+        satisfactionLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 15));
+        ProgressBar satisfactionBar = new ProgressBar(0.92);
+        satisfactionBar.setPrefWidth(220);
+        satisfactionBar.setStyle("-fx-accent: #222;");
+        Label satisfactionPercent = new Label("92%");
+        HBox satisfactionBox = new HBox(10, satisfactionLabel, satisfactionPercent);
+        satisfactionBox.setAlignment(Pos.CENTER_LEFT);
+        HBox satisfactionBarBox = new HBox(10, satisfactionBar);
+        satisfactionBarBox.setAlignment(Pos.CENTER_LEFT);
+
+        // Appointment Completion Rate Bar
+        Label completionLabel = new Label("Appointment Completion Rate");
+        completionLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 15));
+        ProgressBar completionBar = new ProgressBar(0.98);
+        completionBar.setPrefWidth(220);
+        completionBar.setStyle("-fx-accent: #222;");
+        Label completionPercent = new Label("98%");
+        HBox completionBox = new HBox(10, completionLabel, completionPercent);
+        completionBox.setAlignment(Pos.CENTER_LEFT);
+        HBox completionBarBox = new HBox(10, completionBar);
+        completionBarBox.setAlignment(Pos.CENTER_LEFT);
+
+        Separator analyticsSep = new Separator();
+
+        HBox mostCommonConditionBox = new HBox(10);
+        Label mostCommonLabel = new Label("Most Common Condition");
+        mostCommonLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 15));
+        Label mostCommonValue = new Label("Hypertension");
+        mostCommonValue.setFont(Font.font("Times New Roman", 15));
+        mostCommonConditionBox.getChildren().addAll(mostCommonLabel, mostCommonValue);
+        mostCommonConditionBox.setAlignment(Pos.CENTER_LEFT);
+
+        analyticsSection.getChildren().addAll(
+                analyticsTitle,
+                analyticsStats,
+                satisfactionBox, satisfactionBarBox,
+                completionBox, completionBarBox,
+                analyticsSep,
+                mostCommonConditionBox
+        );
+
+        // Upcoming Tasks Section
+        VBox tasksSection = new VBox(18);
+        tasksSection.setPadding(new Insets(24, 24, 24, 24));
+        tasksSection.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e0e0e0, 4, 0, 0, 2);");
+
+        Label tasksTitle = new Label("Upcoming Tasks");
+        tasksTitle.setFont(Font.font("Times New Roman", FontWeight.BOLD, 24));
+
+        // Task 1
+        VBox task1 = new VBox(2);
+        Label task1Title = new Label("Complete Medical Records");
+        task1Title.setFont(Font.font("Times New Roman", FontWeight.BOLD, 17));
+        Label task1Desc = new Label("Update medical records for John Smith and Emily Johnson");
+        task1Desc.setFont(Font.font("Times New Roman", 14));
+        task1Desc.setTextFill(Color.GRAY);
+        Label task1Due = new Label("Due Today");
+        task1Due.setFont(Font.font("Times New Roman", 13));
+        task1Due.setTextFill(Color.GRAY);
+        Label task1Priority = new Label("High Priority");
+        task1Priority.setFont(Font.font("Times New Roman", 13));
+        task1Priority.setStyle("-fx-background-color: #e3f2fd; -fx-text-fill: #1976d2; -fx-background-radius: 12; -fx-padding: 2 12 2 12;");
+        HBox task1Header = new HBox(task1Title, new Region(), task1Priority);
+        HBox.setHgrow(task1Header.getChildren().get(1), Priority.ALWAYS);
+        task1.getChildren().addAll(task1Header, task1Desc, task1Due);
+        task1.setStyle("-fx-background-color: #f6f8fc; -fx-background-radius: 8; -fx-padding: 12 16 12 16;");
+
+        // Task 2
+        VBox task2 = new VBox(2);
+        Label task2Title = new Label("Lab Results Review");
+        task2Title.setFont(Font.font("Times New Roman", FontWeight.BOLD, 17));
+        Label task2Desc = new Label("Review lab results for 3 patients");
+        task2Desc.setFont(Font.font("Times New Roman", 14));
+        task2Desc.setTextFill(Color.GRAY);
+        Label task2Due = new Label("Due May 6, 2025");
+        task2Due.setFont(Font.font("Times New Roman", 13));
+        task2Due.setTextFill(Color.GRAY);
+        Label task2Priority = new Label("Medium Priority");
+        task2Priority.setFont(Font.font("Times New Roman", 13));
+        task2Priority.setStyle("-fx-background-color: #f3e5f5; -fx-text-fill: #7b1fa2; -fx-background-radius: 12; -fx-padding: 2 12 2 12;");
+        HBox task2Header = new HBox(task2Title, new Region(), task2Priority);
+        HBox.setHgrow(task2Header.getChildren().get(1), Priority.ALWAYS);
+        task2.getChildren().addAll(task2Header, task2Desc, task2Due);
+        task2.setStyle("-fx-background-color: #f6f8fc; -fx-background-radius: 8; -fx-padding: 12 16 12 16;");
+
+        // Task 3
+        VBox task3 = new VBox(2);
+        Label task3Title = new Label("Medical Conference");
+        task3Title.setFont(Font.font("Times New Roman", FontWeight.BOLD, 17));
+        Label task3Desc = new Label("Annual Cardiology Conference");
+        task3Desc.setFont(Font.font("Times New Roman", 14));
+        task3Desc.setTextFill(Color.GRAY);
+        Label task3Due = new Label("May 15-17, 2025");
+        task3Due.setFont(Font.font("Times New Roman", 13));
+        task3Due.setTextFill(Color.GRAY);
+        Label task3Priority = new Label("Upcoming Event");
+        task3Priority.setFont(Font.font("Times New Roman", 13));
+        task3Priority.setStyle("-fx-background-color: #e0f7fa; -fx-text-fill: #00838f; -fx-background-radius: 12; -fx-padding: 2 12 2 12;");
+        HBox task3Header = new HBox(task3Title, new Region(), task3Priority);
+        HBox.setHgrow(task3Header.getChildren().get(1), Priority.ALWAYS);
+        task3.getChildren().addAll(task3Header, task3Desc, task3Due);
+        task3.setStyle("-fx-background-color: #f6f8fc; -fx-background-radius: 8; -fx-padding: 12 16 12 16;");
+
+        tasksSection.getChildren().addAll(tasksTitle, task1, task2, task3);
+
+        rightPanel.getChildren().addAll(analyticsSection, tasksSection);
+
+        // --- Main Area (mainContent + rightPanel side by side) ---
+        HBox mainArea = new HBox(mainContent, rightPanel);
+        HBox.setHgrow(mainContent, Priority.ALWAYS);
+        HBox.setHgrow(rightPanel, Priority.NEVER);
+
+        // --- Layout ---
+        HBox root = new HBox(sidebar, mainArea);
+        HBox.setHgrow(mainArea, Priority.ALWAYS);
+
+        Scene scene = new Scene(root, 1300, 800);
+        primaryStage.setTitle("Doctor Dashboard");
+        primaryStage.setScene(scene);
+        primaryStage.setResizable(false);
+        primaryStage.show();
+    }
+
+    private Button createSidebarItem(String text, String icon, boolean active, Stage primaryStage) {
+        Button button = new Button();
+        button.setStyle(active ? 
+            "-fx-background-color: #e9f1ff; -fx-background-radius: 8 0 0 8; -fx-padding: 8 0 8 32;" :
+            "-fx-background-color: transparent; -fx-padding: 8 0 8 32;");
+        button.setPrefWidth(240);
+        button.setAlignment(Pos.CENTER_LEFT);
+
+        HBox content = new HBox(16);
+        content.setAlignment(Pos.CENTER_LEFT);
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Times New Roman", 22));
+        Label textLabel = new Label(text);
+        textLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 18));
+        content.getChildren().addAll(iconLabel, textLabel);
+        button.setGraphic(content);
+
+        return button;
+    }
+
+    private VBox createStatCard(String value, String label) {
+        VBox card = new VBox(6);
+        card.setAlignment(Pos.CENTER);
+        card.setPrefWidth(200);
+        card.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, #e0e0e0, 4, 0, 0, 2);");
+        Label valueLabel = new Label(value);
+        valueLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 32));
+        Label labelLabel = new Label(label);
+        labelLabel.setFont(Font.font("Times New Roman", 15));
+        labelLabel.setTextFill(Color.GRAY);
+        card.getChildren().addAll(valueLabel, labelLabel);
+        return card;
+    }
+
+    private HBox createAppointmentCard(String name, String status, String time, String desc, String statusColor) {
+        HBox card = new HBox(16);
+        card.setPadding(new Insets(18, 16, 18, 16));
+        card.setStyle("-fx-background-color: #f5f7fa; -fx-background-radius: 8;");
+        card.setAlignment(Pos.CENTER_LEFT);
+
+        Circle avatar = new Circle(20, Color.web("#e9f1ff"));
+        Label avatarIcon = new Label("\uD83D\uDC64");
+        avatarIcon.setFont(Font.font("Times New Roman", 22));
+        StackPane avatarPane = new StackPane(avatar, avatarIcon);
+
+        VBox details = new VBox(2);
+        HBox nameStatus = new HBox(8);
+        Label nameLabel = new Label(name);
+        nameLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 17));
+        Label statusLabel = new Label(status);
+        statusLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 13));
+        statusLabel.setStyle("-fx-background-color: " + statusColor + "; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 2 10 2 10;");
+        nameStatus.getChildren().addAll(nameLabel, statusLabel);
+
+        Label timeLabel = new Label(time);
+        timeLabel.setFont(Font.font("Times New Roman", 14));
+        timeLabel.setTextFill(Color.GRAY);
+        Label descLabel = new Label(desc);
+        descLabel.setFont(Font.font("Times New Roman", 14));
+        descLabel.setTextFill(Color.GRAY);
+
+        details.getChildren().addAll(nameStatus, timeLabel, descLabel);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button viewBtn = new Button("View Records");
+        viewBtn.setStyle("-fx-background-color: #222; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+        Button startBtn = new Button("Start Appointment");
+        startBtn.setStyle("-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+        HBox actions = new HBox(8, viewBtn, startBtn);
+
+        card.getChildren().addAll(avatarPane, details, spacer, actions);
+        return card;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
